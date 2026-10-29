@@ -1,0 +1,7 @@
+node_modules
+.git
+assets/previews
+assets/blender
+test
+tools
+.claude

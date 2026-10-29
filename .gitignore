@@ -1,0 +1,8 @@
+node_modules/
+*.blend1
+.DS_Store
+Thumbs.db
+/tmp/
+/assets/previews/
+dist/
+.claude/

@@ -1,0 +1,30 @@
+{
+  "name": "riftline",
+  "version": "0.1.0",
+  "description": "브라우저 팀 히어로 슈터 — 5대5 온라인 거점 점령, 서버 권위 넷코드, Blender 절차 생성 애셋",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jeiel85/riftline.git"
+  },
+  "homepage": "https://jeiel85.github.io/riftline/",
+  "private": true,
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "gen:map": "node tools/gen-map.mjs",
+    "build:assets": "node tools/build-assets.mjs",
+    "check:assets": "node tools/check-assets.mjs",
+    "test": "node --test \"test/*.test.js\"",
+    "smoke": "node tools/smoke-test.mjs",
+    "build:pages": "node tools/build-pages.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "three": "^0.186.1",
+    "ws": "^8.22.0"
+  }
+}

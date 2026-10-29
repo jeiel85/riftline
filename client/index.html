@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Riftline</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/build/three.module.js",
+        "three/addons/": "./vendor/three/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <div id="view"></div>
+
+    <!-- ── 메인 메뉴 ── -->
+    <section id="menu" class="screen">
+      <div class="menu-card">
+        <h1 class="logo">RIFTLINE</h1>
+        <p class="tagline">5인 팀 히어로 슈터 · 거점 점령</p>
+        <form id="join-form" autocomplete="off">
+          <label>닉네임<input id="in-name" maxlength="14" placeholder="이름을 입력하세요" required></label>
+          <label>방 코드<input id="in-room" maxlength="16" placeholder="public"></label>
+          <label>팀당 인원(빈자리는 봇으로 채움)
+            <select id="in-teamsize">
+              <option value="0">봇 없음</option>
+              <option value="1">1 vs 1</option>
+              <option value="2">2 vs 2</option>
+              <option value="3" selected>3 vs 3</option>
+              <option value="4">4 vs 4</option>
+              <option value="5">5 vs 5</option>
+            </select>
+          </label>
+          <p class="hint" id="room-hint">같은 방 코드로 들어오면 함께 플레이합니다. 팀 인원 설정은 방을 처음 만들 때만 적용됩니다.</p>
+          <button type="submit" id="btn-join" class="primary">입장</button>
+          <button type="button" id="btn-offline">혼자 봇과 연습 (서버 없이)</button>
+          <p id="static-note" class="hint" hidden>이 페이지는 게임 서버 없이 브라우저 안에서 봇과 대전하는 데모입니다. 친구와 온라인으로 하려면 서버를 직접 실행하세요(<a href="https://github.com/jeiel85/riftline#readme" target="_blank" rel="noopener">설치 방법</a>).</p>
+          <p id="menu-error" class="error" hidden></p>
+        </form>
+        <div class="room-list" id="room-list">
+          <div class="room-list-head"><span>열린 방</span><button type="button" id="btn-refresh" class="ghost">새로고침</button></div>
+          <ul id="rooms"></ul>
+        </div>
+      </div>
+      <div class="menu-help">
+        <h2>조작</h2>
+        <dl>
+          <dt>WASD</dt><dd>이동</dd>
+          <dt>Space</dt><dd>점프</dd>
+          <dt>마우스 왼쪽</dt><dd>사격</dd>
+          <dt>마우스 오른쪽</dt><dd>조준경(루크)</dd>
+          <dt>Shift</dt><dd>이동기</dd>
+          <dt>E</dt><dd>스킬</dd>
+          <dt>Q</dt><dd>궁극기</dd>
+          <dt>R</dt><dd>재장전</dd>
+          <dt>H</dt><dd>히어로 변경(스폰룸·사망 시)</dd>
+          <dt>Tab</dt><dd>점수판</dd>
+          <dt>Enter</dt><dd>채팅</dd>
+          <dt>Esc</dt><dd>메뉴</dd>
+        </dl>
+        <p>중앙 거점을 점령하고 지키면 팀 점수가 오릅니다. 먼저 100%에 도달한 팀이 승리합니다.</p>
+      </div>
+    </section>
+
+    <!-- ── 로딩 ── -->
+    <section id="loading" class="screen" hidden>
+      <div class="loading-box"><div class="spinner"></div><p id="loading-text">애셋 불러오는 중…</p></div>
+    </section>
+
+    <!-- ── 히어로 선택 ── -->
+    <section id="hero-select" class="screen overlay" hidden>
+      <div class="hs-head">
+        <h2>히어로 선택</h2>
+        <div class="hs-team">소속: <b id="hs-team-name"></b> <button type="button" id="btn-team" class="ghost">팀 변경</button></div>
+      </div>
+      <div id="hero-cards" class="hero-cards"></div>
+      <div id="hero-detail" class="hero-detail"></div>
+      <div class="hs-foot">
+        <span id="hs-note" class="hint"></span>
+        <button type="button" id="btn-hero-ok" class="primary" disabled>이 히어로로 플레이</button>
+      </div>
+    </section>
+
+    <!-- ── 일시정지 ── -->
+    <section id="pause" class="screen overlay" hidden>
+      <div class="pause-card">
+        <h2>일시정지</h2>
+        <button type="button" id="btn-resume" class="primary">계속하기</button>
+        <button type="button" id="btn-change-hero">히어로 변경</button>
+        <div class="settings">
+          <label>마우스 감도 <output id="out-sens"></output><input type="range" id="set-sens" min="0.2" max="3" step="0.05"></label>
+          <label>시야각(FOV) <output id="out-fov"></output><input type="range" id="set-fov" min="60" max="100" step="1"></label>
+          <label>음량 <output id="out-vol"></output><input type="range" id="set-vol" min="0" max="1" step="0.05"></label>
+        </div>
+        <p class="hint">방 코드 <b id="pause-room"></b> · 지연 <b id="pause-ping">-</b></p>
+        <button type="button" id="btn-leave" class="danger">나가기</button>
+      </div>
+    </section>
+
+    <!-- ── HUD ── -->
+    <section id="hud" hidden>
+      <div id="objective">
+        <div class="obj-phase" id="obj-phase"></div>
+        <div class="obj-row">
+          <div class="obj-score blue"><span id="obj-s0">0%</span></div>
+          <div class="obj-point" id="obj-point">
+            <svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="18" class="ring-bg"/><circle cx="22" cy="22" r="18" class="ring-fg" id="obj-ring"/></svg>
+            <span id="obj-point-label">A</span>
+          </div>
+          <div class="obj-score red"><span id="obj-s1">0%</span></div>
+        </div>
+        <div class="obj-sub" id="obj-sub"></div>
+      </div>
+
+      <div id="crosshair"></div>
+      <div id="hitmarker"></div>
+      <div id="dmg-dirs"></div>
+      <div id="scope" hidden></div>
+      <div id="damage-flash"></div>
+      <div id="tags"></div>
+
+      <div id="killfeed"></div>
+      <div id="announce"></div>
+      <div id="toast"></div>
+
+      <div id="chat">
+        <div id="chat-log"></div>
+        <input id="chat-input" maxlength="120" placeholder="메시지 입력 후 Enter" hidden>
+      </div>
+
+      <div id="player-box">
+        <div id="hero-name"></div>
+        <div class="hp-wrap"><div id="hp-bar"></div><span id="hp-text"></span></div>
+        <div id="status-icons"></div>
+      </div>
+
+      <div id="abilities">
+        <div class="ab" id="ab-shift"><span class="key">Shift</span><span class="cd"></span><span class="nm"></span></div>
+        <div class="ab" id="ab-e"><span class="key">E</span><span class="cd"></span><span class="nm"></span></div>
+        <div class="ab ult" id="ab-q"><span class="key">Q</span><span class="cd"></span><span class="nm"></span></div>
+      </div>
+
+      <div id="ammo-box"><span id="ammo"></span><span id="ammo-max"></span><div id="reload-bar"></div></div>
+
+      <div id="respawn" hidden>
+        <div id="respawn-text"></div>
+        <div class="hint">H 키로 히어로 변경</div>
+      </div>
+
+      <div id="scoreboard" hidden>
+        <div class="sb-team blue"><h3>청색 팀</h3><table><thead><tr><th>이름</th><th>히어로</th><th>처치</th><th>죽음</th><th>피해</th><th>치유</th></tr></thead><tbody id="sb-0"></tbody></table></div>
+        <div class="sb-team red"><h3>적색 팀</h3><table><thead><tr><th>이름</th><th>히어로</th><th>처치</th><th>죽음</th><th>피해</th><th>치유</th></tr></thead><tbody id="sb-1"></tbody></table></div>
+      </div>
+
+      <div id="click-to-play" hidden>클릭해서 조작 시작</div>
+    </section>
+  </div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
